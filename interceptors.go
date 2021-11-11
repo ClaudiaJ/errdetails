@@ -24,7 +24,7 @@ func UnaryServerInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryS
 // assert StreamServerInterceptor is of the same type StreamServerInterceptor
 var _ grpc.StreamServerInterceptor = StreamServerInterceptor
 
-// StreamServerInterceptortranscribes wrapped errors with details into gRPC Status.
+// StreamServerInterceptor transcribes wrapped errors with details into gRPC Status.
 func StreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 	return translateError(handler(srv, ss))
 }
