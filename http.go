@@ -36,7 +36,7 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// render localizable messages
 		if loc, ok := verr.(localizable); ok {
 			if msg, err := loc.Localize(r); err == nil {
-				err = msg
+				verr = msg
 			}
 		}
 		// turn error details into protobuf details
