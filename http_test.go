@@ -13,6 +13,8 @@ import (
 )
 
 func TestHandler(t *testing.T) {
+	testHandler(t)
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/", nil)
 
@@ -65,6 +67,8 @@ func TestHandler(t *testing.T) {
 }
 
 func TestFromJSON(t *testing.T) {
+	testHandler(t)
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/", nil)
 
@@ -111,4 +115,17 @@ func TestFromJSON(t *testing.T) {
 	if got, want := violation.GetSubject(), "auth0|123456789"; got != want {
 		t.Errorf("unexpected quota violation subject; got %q, want %q", got, want)
 	}
+}
+
+type errFunc func(err error)
+
+func (fn errFunc) Handle(err error) {
+	fn(err)
+}
+
+func testHandler(t *testing.T) {
+	t.Helper()
+	SetErrorHandler(errFunc(func(err error) {
+		t.Fatal(err)
+	}))
 }

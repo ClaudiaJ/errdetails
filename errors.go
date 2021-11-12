@@ -9,7 +9,6 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -238,7 +237,6 @@ func (e *errInfo) Unwrap() error {
 // to return to the user.
 type LocalizedError interface {
 	error
-	protoreflect.ProtoMessage
 	details.LocalizedMessage
 }
 

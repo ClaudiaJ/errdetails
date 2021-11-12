@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -33,51 +34,33 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var s *status.Status
+	code := codes.Unknown
 
-	// become a Status one way or another
-	var sterr statusError
-	if !errors.As(verr, &sterr) {
-		sterr = &errCodeError{error: verr, Code: codes.Unknown}
-	}
-
-	p := status.Convert(sterr).Proto()
-	for {
-		// render localizable messages
-		if loc, ok := verr.(localizable); ok {
-			if msg, err := loc.Localize(r); err == nil {
-				verr = msg
-			}
-		}
-		// turn error details into protobuf details
-		if msg, ok := verr.(protoreflect.ProtoMessage); ok {
-			if any, err := anypb.New(msg); err == nil {
-				p.Details = append(p.Details, any)
-			}
-		}
-		// unwrap and move on the next
-		if verr = errors.Unwrap(verr); verr == nil {
-			break
-		}
+	var sterr *errCodeError
+	if errors.As(verr, &sterr) {
+		code = sterr.Code
 	}
 
 	w.Header().Set("Content-Type", contentType)
 
-	var resp json.RawMessage
-	enc := json.NewEncoder(w)
+	buf := new(bytes.Buffer)
+	if err := ToJSON(verr, buf); err != nil {
+		handler.Handle(fmt.Errorf("failed to encode error to JSON: %w", err))
 
-	resp, err := protojson.Marshal(p)
-	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = enc.Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  codes.Internal,
 			"message": "Internal Server Error: failed to encode error response",
-		})
+		}); err != nil {
+			handler.Handle(fmt.Errorf("failed to write internal server error to ResponseWriter: %w", err))
+		}
 		return
 	}
 
-	w.WriteHeader(runtime.HTTPStatusFromCode(s.Code()))
-	_ = enc.Encode(resp)
+	w.WriteHeader(runtime.HTTPStatusFromCode(code))
+	if _, err := buf.WriteTo(w); err != nil {
+		handler.Handle(fmt.Errorf("failed to write JSON encoded error to ResponseWriter: %w", err))
+	}
 }
 
 // DetailsMapper provides a mapping from arbitrary Protobuf message type to an
@@ -90,6 +73,41 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // This will go away whenever I can figure out how to acheive this with protoreflect.
 type DetailsMapper interface {
 	Map(protoreflect.ProtoMessage) Details
+}
+
+// ToJSON writes an error as JSON with details in-tact such that it can be
+// mostly recovered with FromJSON.
+func ToJSON(from error, w io.Writer) error {
+	// become a Status one way or another
+	var toStatus statusError
+	if !errors.As(from, &toStatus) {
+		toStatus = &errCodeError{error: from, Code: codes.Unknown}
+	}
+
+	p := status.Convert(toStatus).Proto()
+	for {
+		// turn error details into protobuf details
+		if msg, ok := from.(protoreflect.ProtoMessage); ok {
+			any, err := anypb.New(msg)
+			if err != nil {
+				return err
+			}
+			p.Details = append(p.Details, any)
+		}
+		// unwrap and move on the next
+		if from = errors.Unwrap(from); from == nil {
+			break
+		}
+	}
+
+	var resp json.RawMessage
+	enc := json.NewEncoder(w)
+
+	resp, err := protojson.Marshal(p)
+	if err != nil {
+		return err
+	}
+	return enc.Encode(resp)
 }
 
 // FromJSON reads JSON fom a Reader like a response Body, and makes best effort
