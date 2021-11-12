@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // assert UnaryServerInterceptor is of the same type UnaryServerInterceptor
@@ -39,8 +39,8 @@ func translateError(err error) error {
 	p := status.Convert(sterr).Proto()
 	for {
 		// turn error details into protobuf details
-		if msg, ok := err.(proto.Message); ok {
-			if any, err := ptypes.MarshalAny(msg); err == nil {
+		if msg, ok := err.(protoreflect.ProtoMessage); ok {
+			if any, err := anypb.New(msg); err == nil {
 				p.Details = append(p.Details, any)
 			}
 		}
