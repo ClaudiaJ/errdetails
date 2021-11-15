@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ClaudiaJ/errdetails/details"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -73,6 +74,11 @@ func (e *errCodeError) Is(target error) bool {
 // error into a gRPC Status.
 func (e *errCodeError) GRPCStatus() *status.Status {
 	return status.New(e.Code, e.Error())
+}
+
+// StatusCode translates the gRPC Status Code to an equivilent HTTP status code.
+func (e *errCodeError) StatusCode() int {
+	return runtime.HTTPStatusFromCode(e.Code)
 }
 
 // Unwrap implements errors.Unwrap interface.

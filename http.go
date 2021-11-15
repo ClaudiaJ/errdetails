@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -34,11 +33,11 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code := codes.Unknown
+	statusCode := http.StatusInternalServerError
 
-	var sterr *errCodeError
+	var sterr hasStatusCode
 	if errors.As(verr, &sterr) {
-		code = sterr.Code
+		statusCode = sterr.StatusCode()
 	}
 
 	w.Header().Set("Content-Type", contentType)
@@ -57,7 +56,7 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(runtime.HTTPStatusFromCode(code))
+	w.WriteHeader(statusCode)
 	if _, err := buf.WriteTo(w); err != nil {
 		handler.Handle(fmt.Errorf("failed to write JSON encoded error to ResponseWriter: %w", err))
 	}
@@ -206,6 +205,10 @@ func (e *arbitraryError) Unwrap() error {
 type statusError interface {
 	error
 	GRPCStatus() *status.Status
+}
+
+type hasStatusCode interface {
+	StatusCode() int
 }
 
 type localizable interface {
