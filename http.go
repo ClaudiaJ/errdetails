@@ -42,8 +42,8 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", contentType)
 
-	buf := new(bytes.Buffer)
-	if err := ToJSON(verr, buf); err != nil {
+	b, err := ToJSON(verr)
+	if err != nil {
 		handler.Handle(fmt.Errorf("failed to encode error to JSON: %w", err))
 
 		w.WriteHeader(http.StatusInternalServerError)
@@ -56,8 +56,9 @@ func (fn HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resp := json.RawMessage(b)
 	w.WriteHeader(statusCode)
-	if _, err := buf.WriteTo(w); err != nil {
+	if err := json.NewEncoder(w).Encode(&resp); err != nil {
 		handler.Handle(fmt.Errorf("failed to write JSON encoded error to ResponseWriter: %w", err))
 	}
 }
@@ -76,7 +77,7 @@ type DetailsMapper interface {
 
 // ToJSON writes an error as JSON with details in-tact such that it can be
 // mostly recovered with FromJSON.
-func ToJSON(from error, w io.Writer) error {
+func ToJSON(from error) ([]byte, error) {
 	// become a Status one way or another
 	var toStatus statusError
 	if !errors.As(from, &toStatus) {
@@ -89,7 +90,7 @@ func ToJSON(from error, w io.Writer) error {
 		if msg, ok := from.(protoreflect.ProtoMessage); ok {
 			any, err := anypb.New(msg)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			p.Details = append(p.Details, any)
 		}
@@ -99,14 +100,7 @@ func ToJSON(from error, w io.Writer) error {
 		}
 	}
 
-	var resp json.RawMessage
-	enc := json.NewEncoder(w)
-
-	resp, err := protojson.Marshal(p)
-	if err != nil {
-		return err
-	}
-	return enc.Encode(resp)
+	return protojson.Marshal(p)
 }
 
 // FromJSON reads JSON fom a Reader like a response Body, and makes best effort

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ClaudiaJ/errdetails/details"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -30,6 +31,15 @@ type wrapperFunc func(err error) error
 // Wrap wraps an error inside another error
 func (fn wrapperFunc) Wrap(err error) error {
 	return fn(err)
+}
+
+// Code wraps an external error with a specified Status Code.
+// Note that while it is possible to wrap an error with multiple status codes,
+// only the outer layer will be considered the resulting Status Code when unwrapped.
+func Code(code codes.Code) Details {
+	return wrapperFunc(func(err error) error {
+		return &errCodeError{error: err, Code: code}
+	})
 }
 
 // BadRequest provides a Details wrapper to enrich errors with BadRequestError details.
