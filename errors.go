@@ -2,7 +2,6 @@ package errdetails
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ClaudiaJ/errdetails/details"
@@ -53,11 +52,6 @@ func New(code codes.Code, msg string, details ...Details) error {
 type errCodeError struct {
 	error
 	codes.Code
-}
-
-// Error implements error, prefixes with the Status code string.
-func (e *errCodeError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Code.String(), e.error)
 }
 
 // Is implements errors.Is, matches a target error if it implements errorCode
